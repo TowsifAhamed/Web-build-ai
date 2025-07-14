@@ -3,6 +3,18 @@ from pydantic import BaseModel, Field
 import subprocess, os, json, textwrap
 from groq import AsyncGroq
 from dotenv import load_dotenv
+
+# Load environment variables from a local .env file so the Groq API key
+# can be provided without exporting it globally.
+load_dotenv()
+
+# Retrieve the Groq API key from the environment and fail fast if it's missing
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if not GROQ_API_KEY:
+    raise RuntimeError(
+        "GROQ_API_KEY environment variable not set. "
+        "Create a .env file with GROQ_API_KEY=your_key."
+    )
 import argparse
 
 SANDBOX = os.path.abspath(os.path.join(os.path.dirname(__file__), "site-dir"))
@@ -94,7 +106,7 @@ def search_docs(arg: SearchQuery) -> str:
 @app.tool(name="compound_tool", description="Agent that uses Groq LLM to call other tools")
 async def compound_tool(messages: list[dict], model: str = "meta-llama/llama-4-maverick-17b-128e-instruct") -> list[str]:
     """Use Groq's chat completion API with function calls to invoke tools."""
-    client = AsyncGroq()
+    client = AsyncGroq(api_key=GROQ_API_KEY)
 
     tools = [
         {
@@ -225,7 +237,6 @@ def ensure_sandbox() -> None:
 
 def main() -> None:
     """CLI entry point for the MCP web builder server."""
-    load_dotenv()
     parser = argparse.ArgumentParser(description="Run MCP web builder server")
     parser.add_argument("--model", default="meta-llama/llama-4-maverick-17b-128e-instruct")
     parser.add_argument("--port", type=int, default=4876)
