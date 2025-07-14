@@ -12,6 +12,12 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+Create a `.env` file in the project root and add your Groq API key:
+
+```bash
+echo "GROQ_API_KEY=your_key_here" > .env
+```
+
 ## Running the server
 
 Launch the server with:
@@ -88,3 +94,8 @@ which you can also add back into the list for a persistent conversation.
 The MCP server also exposes a `search_docs` tool that retrieves snippets from
 files in `site-dir/docs/`. Provide a query string and the tool will return any
 matching text, enabling a simple retrieval-augmented workflow.
+
+## License
+
+This project is distributed under the Business Source License 1.1. See the
+[LICENSE](LICENSE) file for the license text and usage terms.
