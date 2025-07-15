@@ -72,3 +72,6 @@ DevOps – GitHub repo with Vercel / Netlify CI-CD; staging branch previews; nig
 Tone & microcopy – Friendly Banglish phrases (e.g., empty cart: “Ektu wait, captain — your loot is empty!”).
 
 Uploaded images: logo.jpg, cover.jpeg
+uploaded images are in uploads folder in the site-dir directory.
+
+Create the html css based website with generated contents and an attractive UI layout with beautiful designs
