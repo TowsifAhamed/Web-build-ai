@@ -87,6 +87,10 @@ html = asyncio.run(compound_tool(messages))
 
 The generated site will be written inside `site-dir/` using the agent's tools.
 
+All file paths passed to tools like `write_file` or `read_file` must be
+relative to `site-dir/`. Absolute paths are rejected to keep generation
+contained within the sandbox.
+
 You can keep the `messages` list and append more `{"role": "user"}` entries to
 perform revisions. Each call to `compound_tool` returns the assistant response
 which you can also add back into the list for a persistent conversation.
@@ -94,6 +98,31 @@ which you can also add back into the list for a persistent conversation.
 The MCP server also exposes a `search_docs` tool that retrieves snippets from
 files in `site-dir/docs/`. Provide a query string and the tool will return any
 matching text, enabling a simple retrieval-augmented workflow.
+
+## Deploying on AWS with NGINX
+
+Below is a minimal outline for serving the UI on an EC2 instance:
+
+1. Launch an Ubuntu server and SSH into it.
+2. Install Python 3.12, NGINX and Git.
+3. Clone this repository and follow the setup instructions above.
+4. Start `website_mcp.py` using a process manager such as `systemd` or `tmux`.
+5. Configure NGINX to forward requests to the MCP server:
+
+    ```nginx
+    server {
+        listen 80;
+        server_name your_domain_or_ip;
+
+        location / {
+            proxy_pass http://127.0.0.1:4876;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+    }
+    ```
+
+6. Restart NGINX and browse to your domain to access the builder.
 
 ## License
 
