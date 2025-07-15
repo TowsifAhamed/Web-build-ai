@@ -9,16 +9,15 @@ from dotenv import load_dotenv
 # can be provided without exporting it globally.
 load_dotenv()
 
-# Retrieve the Groq API key from the environment and fail fast if it's missing
+# Retrieve API keys from the environment. Only one of them is required.
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-if not GROQ_API_KEY:
-    raise RuntimeError(
-        "GROQ_API_KEY environment variable not set. "
-        "Create a .env file with GROQ_API_KEY=your_key."
-    )
-
 # Gemini / Google API key for using Google's Gemini models
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+
+if not GROQ_API_KEY and not GEMINI_API_KEY:
+    raise RuntimeError(
+        "No API key found. Set GROQ_API_KEY or GEMINI_API_KEY in the environment."
+    )
 import argparse
 
 SANDBOX = os.path.abspath(os.path.join(os.path.dirname(__file__), "site-dir"))
@@ -181,6 +180,10 @@ TOOLS = [
 
 async def _run_groq(messages: list[dict], model: str) -> list[str]:
     """Run the conversation using Groq LLM with OpenAI-style tool calling."""
+    if not GROQ_API_KEY:
+        raise RuntimeError(
+            "GROQ_API_KEY environment variable not set."
+        )
     client = AsyncGroq(api_key=GROQ_API_KEY)
 
     conversation = messages[:]

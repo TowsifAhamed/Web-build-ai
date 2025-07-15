@@ -13,22 +13,39 @@ MCP_PORT = 4876
 MCP_URL = f"http://localhost:{MCP_PORT}/sse"
 UPLOAD_DIR = os.path.join("site-dir", "uploads")
 DOCS_DIR = os.path.join("site-dir", "docs")
-DEFAULT_MODEL = os.getenv(
-    "MCP_MODEL",
-    "meta-llama/llama-4-maverick-17b-128e-instruct",
-)
 
-current_model = DEFAULT_MODEL
-
-# Default model choices for the UI selector. Gemini models start with "gemini"
-# to trigger the Gemini integration on the server.
-MODEL_OPTIONS = [
+# Lists of available models sorted by release date (latest first). Only Groq
+# and Gemini models are included here.
+GROQ_MODEL_OPTIONS = [
     "meta-llama/llama-4-maverick-17b-128e-instruct",
+    "meta-llama/llama-4-scout-17b-16e-instruct",
+    "qwen-qwq-32b",
+    "mistral-saba-24b",
+    "gemma2-9b-it",
     "deepseek-ai/deepseek-v2-chat",
-    "gemini-1.5-flash-latest",
-    "gemini-1.5-flash-lite",
-    "gemini-1.5-pro-latest",
+    "llama-3.3-70b-specdec",
+    "llama-3.3-70b-versatile",
+    "llama-3.2-90b-vision-preview",
+    "llama-3.2-11b-vision-preview",
+    "llama-3.1-8b-instant",
+    "llama3-70b-8192",
+    "llama3-8b-8192",
+    "mixtral-8x7b-32768",
+    "llama-guard-3-8b",
+    "deepseek-r1-distill-llama-70b",
 ]
+
+GEMINI_MODEL_OPTIONS = [
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-flash-8b",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
+]
+
+DEFAULT_MODEL_ENV = os.getenv("MCP_MODEL")
+current_model = ""
+MODEL_OPTIONS: list[str] = []
 SPEC_FILE = os.path.join("docs", "spec.md")
 
 # conversation history for revision prompts
@@ -120,6 +137,28 @@ def start_server() -> subprocess.Popen:
 
 
 def main():
+    groq_key = os.getenv("GROQ_API_KEY")
+    gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+
+    global MODEL_OPTIONS, current_model
+    MODEL_OPTIONS = []
+    if groq_key:
+        MODEL_OPTIONS.extend(GROQ_MODEL_OPTIONS)
+    if gemini_key:
+        MODEL_OPTIONS.extend(GEMINI_MODEL_OPTIONS)
+
+    if not MODEL_OPTIONS:
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showerror(
+            "API key required",
+            "Please set GROQ_API_KEY or GEMINI_API_KEY in the environment.",
+        )
+        return
+
+    default_model = DEFAULT_MODEL_ENV or MODEL_OPTIONS[0]
+    current_model = default_model
+
     server = start_server()
     root = tk.Tk()
     root.title("Website Builder")
