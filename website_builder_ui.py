@@ -29,7 +29,14 @@ async def call_compound_tool(prompt: str) -> str:
         return text
 
 def start_server() -> subprocess.Popen:
-    return subprocess.Popen([sys.executable, "website_mcp.py", "--port", str(MCP_PORT)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return subprocess.Popen([
+        sys.executable,
+        "website_mcp.py",
+        "--port",
+        str(MCP_PORT),
+        "--transport",
+        "sse",
+    ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 def main():
     server = start_server()

@@ -23,7 +23,7 @@ echo "GROQ_API_KEY=your_key_here" > .env
 Launch the server with:
 
 ```bash
-python website_mcp.py --port 4876
+python website_mcp.py --port 4876 --transport sse
 ```
 
 The server creates a `site-dir/` directory which acts as a sandbox for generated files. It is automatically added to `.gitignore`.
