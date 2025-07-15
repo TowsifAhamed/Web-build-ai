@@ -54,6 +54,9 @@ Use **Add Docs** to select text guidelines. They are copied into
 `site-dir/docs/` and the contents are added to your prompt so the model follows
 your requirements.
 
+Press **Load Spec** to automatically populate the fields using `docs/spec.md` if
+it exists.
+
 Fill in these fields and click **Run**. The generated HTML and CSS files will appear inside `site-dir/`.
 
 Each time you press **Run**, your prompt is added to the conversation so you can

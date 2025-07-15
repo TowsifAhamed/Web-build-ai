@@ -4,6 +4,7 @@ import subprocess
 import tkinter as tk
 from tkinter import scrolledtext, messagebox, filedialog
 import shutil
+import re
 import anyio
 import webbrowser
 from mcp.client.session_group import ClientSessionGroup, SseServerParameters
@@ -13,6 +14,7 @@ MCP_URL = f"http://localhost:{MCP_PORT}/sse"
 UPLOAD_DIR = os.path.join("site-dir", "uploads")
 DOCS_DIR = os.path.join("site-dir", "docs")
 MODEL = os.getenv("MCP_MODEL", "meta-llama/llama-4-maverick-17b-128e-instruct")
+SPEC_FILE = os.path.join("docs", "spec.md")
 
 # conversation history for revision prompts
 conversation: list[dict] = []
@@ -27,6 +29,51 @@ async def call_compound_tool(prompt: str) -> str:
         text = "".join(text_blocks) if text_blocks else ""
         conversation.append({"role": "assistant", "content": text})
         return text
+
+async def auto_build(prompt: str, iterations: int) -> None:
+    """Run multiple build steps automatically using the MCP server."""
+    conversation.append({"role": "user", "content": prompt})
+    async with ClientSessionGroup() as group:
+        session = await group.connect_to_server(SseServerParameters(url=MCP_URL))
+        for _ in range(iterations):
+            result = await session.call_tool(
+                "compound_tool", {"messages": conversation, "model": MODEL}
+            )
+            text_blocks = [b.text for b in result.content if hasattr(b, "text")]
+            text = "".join(text_blocks) if text_blocks else ""
+            conversation.append({"role": "assistant", "content": text})
+
+def parse_spec_file():
+    """Read docs/spec.md and return parsed fields."""
+    if not os.path.exists(SPEC_FILE):
+        raise FileNotFoundError(SPEC_FILE)
+    with open(SPEC_FILE, "r", encoding="utf-8") as fh:
+        text = fh.read()
+    name = ""
+    style = ""
+    colors = ""
+    desc = text
+    extra = ""
+    m = re.search(r"Business name:\s*(.+)", text)
+    if m:
+        name = m.group(1).strip()
+    m = re.search(r"Proposed tagline:\s*(.+)", text)
+    tagline = m.group(1).strip() if m else ""
+    m = re.search(r"Overall vibe:\s*(.+)", text)
+    if m:
+        style = m.group(1).strip()
+    m = re.search(r"Color scheme:(.*?)(?:\nFollow|\nAdditional|\nAccessibility|\nPerformance|$)", text, re.S)
+    if m:
+        colors = " ".join(line.strip() for line in m.group(1).splitlines() if line.strip())
+    m = re.search(r"Structure & key pages(.*?)(?:\nResponsive grid|\nDesign style:|$)", text, re.S)
+    if m:
+        desc = m.group(1).strip()
+    if tagline:
+        desc = f"Proposed tagline: {tagline}\n\n" + desc
+    m = re.search(r"Additional instructions:(.*)", text, re.S)
+    if m:
+        extra = m.group(1).strip()
+    return name, style, colors, desc, extra
 
 def start_server() -> subprocess.Popen:
     return subprocess.Popen([
@@ -55,6 +102,11 @@ def main():
     color_entry = tk.Entry(root, width=80)
     color_entry.pack(fill="x")
 
+    tk.Label(root, text="Build steps:").pack(anchor="w")
+    iter_var = tk.IntVar(value=3)
+    iter_entry = tk.Entry(root, textvariable=iter_var, width=5)
+    iter_entry.pack(anchor="w")
+
     tk.Label(root, text="Website description:").pack(anchor="w")
     prompt_box = scrolledtext.ScrolledText(root, width=80, height=6)
     prompt_box.pack(fill="both", expand=True)
@@ -75,6 +127,24 @@ def main():
 
     doc_paths: list[str] = []
 
+    def fill_from_spec():
+        try:
+            name, style, colors, desc, extra = parse_spec_file()
+        except FileNotFoundError:
+            messagebox.showerror("Spec missing", f"{SPEC_FILE} not found")
+            return
+        name_entry.delete(0, tk.END)
+        name_entry.insert(0, name)
+        style_entry.delete(0, tk.END)
+        style_entry.insert(0, style)
+        color_entry.delete(0, tk.END)
+        color_entry.insert(0, colors)
+        prompt_box.delete("1.0", tk.END)
+        prompt_box.insert(tk.END, desc)
+        extra_box.delete("1.0", tk.END)
+        extra_box.insert(tk.END, extra)
+
+
     def add_images():
         paths = filedialog.askopenfilenames(title="Select images")
         for p in paths:
@@ -94,6 +164,9 @@ def main():
 
     add_doc_btn = tk.Button(root, text="Add Docs", command=add_docs)
     add_doc_btn.pack(pady=2)
+
+    load_spec_btn = tk.Button(root, text="Load Spec", command=fill_from_spec)
+    load_spec_btn.pack(pady=2)
 
     tk.Label(root, text="Conversation:").pack(anchor="w")
     chat_history = scrolledtext.ScrolledText(root, width=80, height=10, state=tk.DISABLED)
@@ -174,9 +247,10 @@ def main():
                 parts.append("Guideline docs:\n" + "\n\n".join(doc_texts))
 
         final_prompt = " \n".join(p for p in parts if p)
+        iterations = iter_var.get()
         run_btn.config(state=tk.DISABLED)
         try:
-            anyio.run(call_compound_tool, final_prompt)
+            anyio.run(auto_build, final_prompt, iterations)
             update_history()
             if os.path.exists(SITE_INDEX):
                 site_label.config(text=f"Site: {SITE_INDEX}")
