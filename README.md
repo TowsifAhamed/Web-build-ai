@@ -62,6 +62,11 @@ fresh conversation. When generation finishes, the UI opens `site-dir/index.html`
 in your browser and shows the path in a link. You can also press **Open Site**
 at any time to view the latest version.
 
+The interface also includes a chat area that displays the full conversation.
+You can send additional messages in the **Chat input** box and press **Send** to
+continue iterating on the site. The latest assistant replies and your prompts
+appear in the **Conversation** window so you can track changes easily.
+
 ## Using the agent
 
 You can call the `compound_tool` function programmatically to instruct the agent to build a website. Example:
