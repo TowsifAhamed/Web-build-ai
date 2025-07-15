@@ -3,17 +3,41 @@ import argparse
 import anyio
 from website_mcp import compound_tool
 
+# Prompt given to the LLM before any build steps. It explains how to use the
+# available tools to generate or update files inside the sandbox. This helps
+# ensure the model actually writes HTML/CSS rather than only describing it.
+SYSTEM_PROMPT = (
+    "You are an expert web developer. Use write_file to create or overwrite "
+    "files inside the site-dir as you build the site. Replace existing files "
+    "when refining the project."
+)
+
+
 SPEC_PATH = os.path.join('docs', 'spec.md')
 
 async def auto_build(iterations: int, model: str) -> None:
     """Run compound_tool repeatedly to incrementally build the site."""
+    if iterations < 1:
+        raise ValueError("iterations must be >= 1")
     if not os.path.exists(SPEC_PATH):
         raise FileNotFoundError(f"Spec file not found: {SPEC_PATH}")
     with open(SPEC_PATH, 'r', encoding='utf-8') as fh:
         spec = fh.read()
 
-    messages = [{"role": "user", "content": spec}]
-    for _ in range(iterations):
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": spec},
+    ]
+    for step in range(iterations):
+        if step > 0:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "Please refine the website. Replace any older files with improved versions and add new code as needed."
+                    ),
+                }
+            )
         result = await compound_tool(messages, model=model)
         if result:
             messages.append({"role": "assistant", "content": result[0]})
