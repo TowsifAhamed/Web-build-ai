@@ -19,6 +19,14 @@ import argparse
 
 SANDBOX = os.path.abspath(os.path.join(os.path.dirname(__file__), "site-dir"))
 
+
+def sandbox_path(rel: str) -> str:
+    """Return an absolute path inside the sandbox or raise ValueError."""
+    full = os.path.abspath(os.path.join(SANDBOX, rel))
+    if not full.startswith(SANDBOX + os.sep):
+        raise ValueError("Path escapes sandbox")
+    return full
+
 # FastMCP application instance used to register tools
 app = FastMCP()
 
@@ -29,7 +37,7 @@ class PathArg(BaseModel):
 
 @app.tool(name="write_file", description="Create or overwrite a text file")
 def write_file(path: PathArg, content: str) -> str:
-    full = os.path.join(SANDBOX, path.path)
+    full = sandbox_path(path.path)
     os.makedirs(os.path.dirname(full), exist_ok=True)
     with open(full, "w", encoding="utf-8") as fh:
         fh.write(content)
@@ -38,7 +46,7 @@ def write_file(path: PathArg, content: str) -> str:
 
 @app.tool(name="read_file", description="Read a text file")
 def read_file(path: PathArg) -> str:
-    full = os.path.join(SANDBOX, path.path)
+    full = sandbox_path(path.path)
     with open(full, encoding="utf-8") as fh:
         return fh.read()
 
