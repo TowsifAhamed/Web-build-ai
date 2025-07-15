@@ -2,6 +2,7 @@ from mcp.server import FastMCP
 from pydantic import BaseModel, Field
 import subprocess, os, json, textwrap
 from groq import AsyncGroq
+import google.generativeai as genai
 from dotenv import load_dotenv
 
 # Load environment variables from a local .env file so the Groq API key
@@ -15,6 +16,9 @@ if not GROQ_API_KEY:
         "GROQ_API_KEY environment variable not set. "
         "Create a .env file with GROQ_API_KEY=your_key."
     )
+
+# Gemini / Google API key for using Google's Gemini models
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 import argparse
 
 SANDBOX = os.path.abspath(os.path.join(os.path.dirname(__file__), "site-dir"))
@@ -26,6 +30,7 @@ def sandbox_path(rel: str) -> str:
     if not full.startswith(SANDBOX + os.sep):
         raise ValueError("Path escapes sandbox")
     return full
+
 
 # FastMCP application instance used to register tools
 app = FastMCP()
@@ -111,72 +116,72 @@ def search_docs(arg: SearchQuery) -> str:
     return "\n\n".join(results)[:4096]
 
 
-@app.tool(name="compound_tool", description="Agent that uses Groq LLM to call other tools")
-async def compound_tool(messages: list[dict], model: str = "meta-llama/llama-4-maverick-17b-128e-instruct") -> list[str]:
-    """Use Groq's chat completion API with function calls to invoke tools."""
-    client = AsyncGroq(api_key=GROQ_API_KEY)
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "write_file",
+            "description": "Create or overwrite a text file",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "content": {"type": "string"},
+                },
+                "required": ["path", "content"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "read_file",
+            "description": "Read a text file",
+            "parameters": {
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_files",
+            "description": "List sandbox dir",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "run_cmd",
+            "description": "Run shell command (e.g. python main.py)",
+            "parameters": {
+                "type": "object",
+                "properties": {"cmd": {"type": "string"}},
+                "required": ["cmd"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_docs",
+            "description": "Search guideline docs for text",
+            "parameters": {
+                "type": "object",
+                "properties": {"query": {"type": "string"}},
+                "required": ["query"],
+            },
+        },
+    },
+]
 
-    tools = [
-        {
-            "type": "function",
-            "function": {
-                "name": "write_file",
-                "description": "Create or overwrite a text file",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "path": {"type": "string"},
-                        "content": {"type": "string"},
-                    },
-                    "required": ["path", "content"],
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "read_file",
-                "description": "Read a text file",
-                "parameters": {
-                    "type": "object",
-                    "properties": {"path": {"type": "string"}},
-                    "required": ["path"],
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "list_files",
-                "description": "List sandbox dir",
-                "parameters": {"type": "object", "properties": {}},
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "run_cmd",
-                "description": "Run shell command (e.g. python main.py)",
-                "parameters": {
-                    "type": "object",
-                    "properties": {"cmd": {"type": "string"}},
-                    "required": ["cmd"],
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "search_docs",
-                "description": "Search guideline docs for text",
-                "parameters": {
-                    "type": "object",
-                    "properties": {"query": {"type": "string"}},
-                    "required": ["query"],
-                },
-            },
-        },
-    ]
+
+async def _run_groq(messages: list[dict], model: str) -> list[str]:
+    """Run the conversation using Groq LLM with OpenAI-style tool calling."""
+    client = AsyncGroq(api_key=GROQ_API_KEY)
 
     conversation = messages[:]
 
@@ -184,7 +189,7 @@ async def compound_tool(messages: list[dict], model: str = "meta-llama/llama-4-m
         response = await client.chat.completions.create(
             model=model,
             messages=conversation,
-            tools=tools,
+            tools=TOOLS,
             tool_choice="auto",
         )
 
@@ -204,7 +209,9 @@ async def compound_tool(messages: list[dict], model: str = "meta-llama/llama-4-m
                     args = {}
 
                 if call.function.name == "write_file":
-                    result = write_file(PathArg(path=args.get("path", "")), args.get("content", ""))
+                    result = write_file(
+                        PathArg(path=args.get("path", "")), args.get("content", "")
+                    )
                 elif call.function.name == "read_file":
                     result = read_file(PathArg(path=args.get("path", "")))
                 elif call.function.name == "list_files":
@@ -227,6 +234,47 @@ async def compound_tool(messages: list[dict], model: str = "meta-llama/llama-4-m
             return [message.content] if message.content else []
 
 
+async def _run_gemini(messages: list[dict], model: str) -> list[str]:
+    """Run the conversation using Google's Gemini models with function calls."""
+    if not GEMINI_API_KEY:
+        raise RuntimeError(
+            "GEMINI_API_KEY or GOOGLE_API_KEY environment variable not set."
+        )
+
+    genai.configure(api_key=GEMINI_API_KEY)
+    history = [
+        {"role": m["role"], "parts": [m.get("content", "")]}
+        for m in messages[:-1]
+        if m.get("content")
+    ]
+    chat = genai.GenerativeModel(model).start_chat(
+        history=history,
+        enable_automatic_function_calling=True,
+    )
+
+    last = messages[-1]
+    response = await chat.send_message_async(
+        last.get("content", ""),
+        tools=[write_file, read_file, list_files, run_cmd, search_docs],
+    )
+
+    content = response.candidates[0].content
+    text_parts = [p.text for p in content.parts if hasattr(p, "text")]
+    return ["".join(text_parts)]
+
+
+@app.tool(
+    name="compound_tool", description="Agent that uses an LLM to call other tools"
+)
+async def compound_tool(
+    messages: list[dict], model: str = "meta-llama/llama-4-maverick-17b-128e-instruct"
+) -> list[str]:
+    """Dispatch to Groq or Gemini depending on the model name."""
+    if model.lower().startswith("gemini"):
+        return await _run_gemini(messages, model)
+    return await _run_groq(messages, model)
+
+
 def ensure_sandbox() -> None:
     """Create the sandbox directory and git-ignore it if needed."""
     os.makedirs(SANDBOX, exist_ok=True)
@@ -246,7 +294,9 @@ def ensure_sandbox() -> None:
 def main() -> None:
     """CLI entry point for the MCP web builder server."""
     parser = argparse.ArgumentParser(description="Run MCP web builder server")
-    parser.add_argument("--model", default="meta-llama/llama-4-maverick-17b-128e-instruct")
+    parser.add_argument(
+        "--model", default="meta-llama/llama-4-maverick-17b-128e-instruct"
+    )
     parser.add_argument("--port", type=int, default=4876)
     parser.add_argument(
         "--transport",

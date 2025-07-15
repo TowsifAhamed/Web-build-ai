@@ -16,7 +16,10 @@ Create a `.env` file in the project root and add your Groq API key:
 
 ```bash
 echo "GROQ_API_KEY=your_key_here" > .env
+echo "GEMINI_API_KEY=your_gemini_key" >> .env
 ```
+The `GEMINI_API_KEY` is optional and only required if you plan to run the agent
+with Google's Gemini models (model names starting with `gemini`).
 
 ## Running the server
 
@@ -41,10 +44,11 @@ When the UI opens you can provide a detailed design concept:
 1. **Business name** – the name or brand for the site.
 2. **Design style** – e.g. modern, minimal, playful.
 3. **Color scheme** – main colors to use.
-4. **Website description** – a short overview of the pages or layout.
-5. **Additional instructions** – any extra features or notes.
-6. **Uploaded images** – optional logos or product pictures you want to include.
-7. **Guideline docs** – text files with design briefs or other requirements.
+4. **Model** – choose from Groq and Gemini models using the drop-down.
+5. **Website description** – a short overview of the pages or layout.
+6. **Additional instructions** – any extra features or notes.
+7. **Uploaded images** – optional logos or product pictures you want to include.
+8. **Guideline docs** – text files with design briefs or other requirements.
 
 Use **Add Images** to select image files from your computer. They will be copied
 into `site-dir/uploads/` and listed in the UI. Mention them in your prompt or

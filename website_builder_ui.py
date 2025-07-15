@@ -13,22 +13,41 @@ MCP_PORT = 4876
 MCP_URL = f"http://localhost:{MCP_PORT}/sse"
 UPLOAD_DIR = os.path.join("site-dir", "uploads")
 DOCS_DIR = os.path.join("site-dir", "docs")
-MODEL = os.getenv("MCP_MODEL", "meta-llama/llama-4-maverick-17b-128e-instruct")
+DEFAULT_MODEL = os.getenv(
+    "MCP_MODEL",
+    "meta-llama/llama-4-maverick-17b-128e-instruct",
+)
+
+current_model = DEFAULT_MODEL
+
+# Default model choices for the UI selector. Gemini models start with "gemini"
+# to trigger the Gemini integration on the server.
+MODEL_OPTIONS = [
+    "meta-llama/llama-4-maverick-17b-128e-instruct",
+    "deepseek-ai/deepseek-v2-chat",
+    "gemini-1.5-flash-latest",
+    "gemini-1.5-flash-lite",
+    "gemini-1.5-pro-latest",
+]
 SPEC_FILE = os.path.join("docs", "spec.md")
 
 # conversation history for revision prompts
 conversation: list[dict] = []
+
 
 async def call_compound_tool(prompt: str) -> str:
     """Send the next user prompt using the conversation history."""
     conversation.append({"role": "user", "content": prompt})
     async with ClientSessionGroup() as group:
         session = await group.connect_to_server(SseServerParameters(url=MCP_URL))
-        result = await session.call_tool("compound_tool", {"messages": conversation, "model": MODEL})
+        result = await session.call_tool(
+            "compound_tool", {"messages": conversation, "model": current_model}
+        )
         text_blocks = [b.text for b in result.content if hasattr(b, "text")]
         text = "".join(text_blocks) if text_blocks else ""
         conversation.append({"role": "assistant", "content": text})
         return text
+
 
 async def auto_build(prompt: str, iterations: int) -> None:
     """Run multiple build steps automatically using the MCP server."""
@@ -37,11 +56,12 @@ async def auto_build(prompt: str, iterations: int) -> None:
         session = await group.connect_to_server(SseServerParameters(url=MCP_URL))
         for _ in range(iterations):
             result = await session.call_tool(
-                "compound_tool", {"messages": conversation, "model": MODEL}
+                "compound_tool", {"messages": conversation, "model": current_model}
             )
             text_blocks = [b.text for b in result.content if hasattr(b, "text")]
             text = "".join(text_blocks) if text_blocks else ""
             conversation.append({"role": "assistant", "content": text})
+
 
 def parse_spec_file():
     """Read docs/spec.md and return parsed fields."""
@@ -62,10 +82,18 @@ def parse_spec_file():
     m = re.search(r"Overall vibe:\s*(.+)", text)
     if m:
         style = m.group(1).strip()
-    m = re.search(r"Color scheme:(.*?)(?:\nFollow|\nAdditional|\nAccessibility|\nPerformance|$)", text, re.S)
+    m = re.search(
+        r"Color scheme:(.*?)(?:\nFollow|\nAdditional|\nAccessibility|\nPerformance|$)",
+        text,
+        re.S,
+    )
     if m:
-        colors = " ".join(line.strip() for line in m.group(1).splitlines() if line.strip())
-    m = re.search(r"Structure & key pages(.*?)(?:\nResponsive grid|\nDesign style:|$)", text, re.S)
+        colors = " ".join(
+            line.strip() for line in m.group(1).splitlines() if line.strip()
+        )
+    m = re.search(
+        r"Structure & key pages(.*?)(?:\nResponsive grid|\nDesign style:|$)", text, re.S
+    )
     if m:
         desc = m.group(1).strip()
     if tagline:
@@ -75,54 +103,87 @@ def parse_spec_file():
         extra = m.group(1).strip()
     return name, style, colors, desc, extra
 
+
 def start_server() -> subprocess.Popen:
-    return subprocess.Popen([
-        sys.executable,
-        "website_mcp.py",
-        "--port",
-        str(MCP_PORT),
-        "--transport",
-        "sse",
-    ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return subprocess.Popen(
+        [
+            sys.executable,
+            "website_mcp.py",
+            "--port",
+            str(MCP_PORT),
+            "--transport",
+            "sse",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
 
 def main():
     server = start_server()
     root = tk.Tk()
     root.title("Website Builder")
+    root.geometry("1000x700")
 
-    tk.Label(root, text="Business name:").pack(anchor="w")
-    name_entry = tk.Entry(root, width=80)
+    pane = tk.PanedWindow(root, orient=tk.HORIZONTAL)
+    pane.pack(fill="both", expand=True)
+
+    left_container = tk.Frame(pane)
+    left_canvas = tk.Canvas(left_container)
+    yscroll = tk.Scrollbar(left_container, orient="vertical", command=left_canvas.yview)
+    scroll_frame = tk.Frame(left_canvas)
+    scroll_frame.bind(
+        "<Configure>",
+        lambda e: left_canvas.configure(scrollregion=left_canvas.bbox("all")),
+    )
+    left_canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
+    left_canvas.configure(yscrollcommand=yscroll.set)
+    left_canvas.pack(side="left", fill="both", expand=True)
+    yscroll.pack(side="right", fill="y")
+
+    right_frame = tk.Frame(pane)
+
+    pane.add(left_container, stretch="always")
+    pane.add(right_frame, stretch="always")
+
+    tk.Label(scroll_frame, text="Business name:").pack(anchor="w")
+    name_entry = tk.Entry(scroll_frame, width=60)
     name_entry.pack(fill="x")
 
-    tk.Label(root, text="Design style:").pack(anchor="w")
-    style_entry = tk.Entry(root, width=80)
+    tk.Label(scroll_frame, text="Design style:").pack(anchor="w")
+    style_entry = tk.Entry(scroll_frame, width=60)
     style_entry.pack(fill="x")
 
-    tk.Label(root, text="Color scheme:").pack(anchor="w")
-    color_entry = tk.Entry(root, width=80)
+    tk.Label(scroll_frame, text="Color scheme:").pack(anchor="w")
+    color_entry = tk.Entry(scroll_frame, width=60)
     color_entry.pack(fill="x")
 
-    tk.Label(root, text="Build steps:").pack(anchor="w")
+    tk.Label(scroll_frame, text="Model:").pack(anchor="w")
+    model_var = tk.StringVar(value=current_model)
+    model_menu = tk.OptionMenu(scroll_frame, model_var, *MODEL_OPTIONS)
+    model_menu.pack(fill="x")
+
+    tk.Label(scroll_frame, text="Build steps:").pack(anchor="w")
     iter_var = tk.IntVar(value=3)
-    iter_entry = tk.Entry(root, textvariable=iter_var, width=5)
+    iter_entry = tk.Entry(scroll_frame, textvariable=iter_var, width=5)
     iter_entry.pack(anchor="w")
 
-    tk.Label(root, text="Website description:").pack(anchor="w")
-    prompt_box = scrolledtext.ScrolledText(root, width=80, height=6)
+    tk.Label(scroll_frame, text="Website description:").pack(anchor="w")
+    prompt_box = scrolledtext.ScrolledText(scroll_frame, width=60, height=6)
     prompt_box.pack(fill="both", expand=True)
 
-    tk.Label(root, text="Additional instructions:").pack(anchor="w")
-    extra_box = scrolledtext.ScrolledText(root, width=80, height=4)
+    tk.Label(scroll_frame, text="Additional instructions:").pack(anchor="w")
+    extra_box = scrolledtext.ScrolledText(scroll_frame, width=60, height=4)
     extra_box.pack(fill="both", expand=True)
 
-    tk.Label(root, text="Uploaded images:").pack(anchor="w")
-    img_list = tk.Listbox(root, width=80, height=4)
+    tk.Label(scroll_frame, text="Uploaded images:").pack(anchor="w")
+    img_list = tk.Listbox(scroll_frame, width=60, height=4)
     img_list.pack(fill="both", expand=True)
 
     image_paths: list[str] = []
 
-    tk.Label(root, text="Guideline docs:").pack(anchor="w")
-    doc_list = tk.Listbox(root, width=80, height=4)
+    tk.Label(scroll_frame, text="Guideline docs:").pack(anchor="w")
+    doc_list = tk.Listbox(scroll_frame, width=60, height=4)
     doc_list.pack(fill="both", expand=True)
 
     doc_paths: list[str] = []
@@ -144,7 +205,6 @@ def main():
         extra_box.delete("1.0", tk.END)
         extra_box.insert(tk.END, extra)
 
-
     def add_images():
         paths = filedialog.askopenfilenames(title="Select images")
         for p in paths:
@@ -152,7 +212,7 @@ def main():
                 image_paths.append(p)
                 img_list.insert(tk.END, os.path.basename(p))
 
-    add_img_btn = tk.Button(root, text="Add Images", command=add_images)
+    add_img_btn = tk.Button(scroll_frame, text="Add Images", command=add_images)
     add_img_btn.pack(pady=2)
 
     def add_docs():
@@ -162,21 +222,25 @@ def main():
                 doc_paths.append(p)
                 doc_list.insert(tk.END, os.path.basename(p))
 
-    add_doc_btn = tk.Button(root, text="Add Docs", command=add_docs)
+    add_doc_btn = tk.Button(scroll_frame, text="Add Docs", command=add_docs)
     add_doc_btn.pack(pady=2)
 
-    load_spec_btn = tk.Button(root, text="Load Spec", command=fill_from_spec)
+    load_spec_btn = tk.Button(scroll_frame, text="Load Spec", command=fill_from_spec)
     load_spec_btn.pack(pady=2)
 
-    tk.Label(root, text="Conversation:").pack(anchor="w")
-    chat_history = scrolledtext.ScrolledText(root, width=80, height=10, state=tk.DISABLED)
+    tk.Label(right_frame, text="Conversation:").pack(anchor="w")
+    chat_history = scrolledtext.ScrolledText(
+        right_frame, width=40, height=10, state=tk.DISABLED
+    )
+    chat_history.tag_config("user", justify="right", background="#dcf8c6")
+    chat_history.tag_config("assistant", justify="left", background="#f0f0f0")
     chat_history.pack(fill="both", expand=True)
 
-    tk.Label(root, text="Chat input:").pack(anchor="w")
-    chat_entry = scrolledtext.ScrolledText(root, width=80, height=3)
+    tk.Label(right_frame, text="Chat input:").pack(anchor="w")
+    chat_entry = scrolledtext.ScrolledText(right_frame, width=40, height=3)
     chat_entry.pack(fill="both", expand=True)
 
-    site_label = tk.Label(root, text="")
+    site_label = tk.Label(right_frame, text="")
     site_label.pack(anchor="w")
 
     SITE_INDEX = os.path.abspath(os.path.join("site-dir", "index.html"))
@@ -187,8 +251,9 @@ def main():
         for msg in conversation:
             if not msg.get("content"):
                 continue
-            role = msg.get("role", "").capitalize()
-            chat_history.insert(tk.END, f"{role}: {msg['content']}\n\n")
+            role = msg.get("role", "")
+            tag = "user" if role == "user" else "assistant"
+            chat_history.insert(tk.END, msg["content"] + "\n\n", tag)
         chat_history.config(state=tk.DISABLED)
 
     def open_site():
@@ -198,13 +263,17 @@ def main():
             messagebox.showinfo("No site", "index.html not found")
 
     def run_prompt():
+        global current_model
+        current_model = model_var.get()
         name = name_entry.get().strip()
         style = style_entry.get().strip()
         colors = color_entry.get().strip()
         desc = prompt_box.get("1.0", tk.END).strip()
         extra = extra_box.get("1.0", tk.END).strip()
         if not desc:
-            messagebox.showwarning("Prompt required", "Please enter a website description")
+            messagebox.showwarning(
+                "Prompt required", "Please enter a website description"
+            )
             return
         parts = [f"Business name: {name}" if name else "", desc]
         if style:
@@ -258,10 +327,12 @@ def main():
         finally:
             run_btn.config(state=tk.NORMAL)
 
-    run_btn = tk.Button(root, text="Run", command=run_prompt)
+    run_btn = tk.Button(scroll_frame, text="Run", command=run_prompt)
     run_btn.pack(pady=5)
 
     def send_chat():
+        global current_model
+        current_model = model_var.get()
         msg = chat_entry.get("1.0", tk.END).strip()
         if not msg:
             return
@@ -275,10 +346,10 @@ def main():
         finally:
             send_btn.config(state=tk.NORMAL)
 
-    send_btn = tk.Button(root, text="Send", command=send_chat)
+    send_btn = tk.Button(right_frame, text="Send", command=send_chat)
     send_btn.pack(pady=2)
 
-    open_btn = tk.Button(root, text="Open Site", command=open_site)
+    open_btn = tk.Button(right_frame, text="Open Site", command=open_site)
     open_btn.pack(pady=2)
 
     def reset():
@@ -289,7 +360,7 @@ def main():
         chat_entry.delete("1.0", tk.END)
         site_label.config(text="")
 
-    reset_btn = tk.Button(root, text="Reset", command=reset)
+    reset_btn = tk.Button(right_frame, text="Reset", command=reset)
     reset_btn.pack(pady=2)
 
     def on_close():
@@ -298,6 +369,7 @@ def main():
 
     root.protocol("WM_DELETE_WINDOW", on_close)
     root.mainloop()
+
 
 if __name__ == "__main__":
     main()

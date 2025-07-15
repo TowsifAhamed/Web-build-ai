@@ -2,3 +2,4 @@ fastmcp
 groq
 python-dotenv
 anyio
+google-generativeai==0.5.2
