@@ -19,7 +19,9 @@ echo "GROQ_API_KEY=your_key_here" > .env
 echo "GEMINI_API_KEY=your_gemini_key" >> .env
 ```
 The `GEMINI_API_KEY` is optional and only required if you plan to run the agent
-with Google's Gemini models (model names starting with `gemini`).
+with Google's Gemini models (model names starting with `gemini`). Both
+`website_mcp.py` and the graphical UI automatically load this `.env` file, so
+the keys do not need to be exported globally.
 
 ## Running the server
 

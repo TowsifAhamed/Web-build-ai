@@ -7,12 +7,18 @@ import shutil
 import re
 import anyio
 import webbrowser
+from dotenv import load_dotenv
 from mcp.client.session_group import ClientSessionGroup, SseServerParameters
 
 MCP_PORT = 4876
 MCP_URL = f"http://localhost:{MCP_PORT}/sse"
 UPLOAD_DIR = os.path.join("site-dir", "uploads")
 DOCS_DIR = os.path.join("site-dir", "docs")
+
+# Load environment variables from a .env file if present so the UI and
+# MCP server both have access to API keys without requiring them to be
+# exported globally.
+load_dotenv()
 
 # Lists of available models sorted by release date (latest first). Only Groq
 # and Gemini models are included here.
