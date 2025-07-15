@@ -95,14 +95,28 @@ def main():
     add_doc_btn = tk.Button(root, text="Add Docs", command=add_docs)
     add_doc_btn.pack(pady=2)
 
-    tk.Label(root, text="Output:").pack(anchor="w")
-    output_box = scrolledtext.ScrolledText(root, width=80, height=10)
-    output_box.pack(fill="both", expand=True)
+    tk.Label(root, text="Conversation:").pack(anchor="w")
+    chat_history = scrolledtext.ScrolledText(root, width=80, height=10, state=tk.DISABLED)
+    chat_history.pack(fill="both", expand=True)
+
+    tk.Label(root, text="Chat input:").pack(anchor="w")
+    chat_entry = scrolledtext.ScrolledText(root, width=80, height=3)
+    chat_entry.pack(fill="both", expand=True)
 
     site_label = tk.Label(root, text="")
     site_label.pack(anchor="w")
 
     SITE_INDEX = os.path.abspath(os.path.join("site-dir", "index.html"))
+
+    def update_history():
+        chat_history.config(state=tk.NORMAL)
+        chat_history.delete("1.0", tk.END)
+        for msg in conversation:
+            if not msg.get("content"):
+                continue
+            role = msg.get("role", "").capitalize()
+            chat_history.insert(tk.END, f"{role}: {msg['content']}\n\n")
+        chat_history.config(state=tk.DISABLED)
 
     def open_site():
         if os.path.exists(SITE_INDEX):
@@ -162,9 +176,8 @@ def main():
         final_prompt = " \n".join(p for p in parts if p)
         run_btn.config(state=tk.DISABLED)
         try:
-            result = anyio.run(call_compound_tool, final_prompt)
-            output_box.delete("1.0", tk.END)
-            output_box.insert(tk.END, result)
+            anyio.run(call_compound_tool, final_prompt)
+            update_history()
             if os.path.exists(SITE_INDEX):
                 site_label.config(text=f"Site: {SITE_INDEX}")
                 webbrowser.open("file://" + SITE_INDEX)
@@ -174,12 +187,32 @@ def main():
     run_btn = tk.Button(root, text="Run", command=run_prompt)
     run_btn.pack(pady=5)
 
+    def send_chat():
+        msg = chat_entry.get("1.0", tk.END).strip()
+        if not msg:
+            return
+        send_btn.config(state=tk.DISABLED)
+        try:
+            anyio.run(call_compound_tool, msg)
+            chat_entry.delete("1.0", tk.END)
+            update_history()
+            if os.path.exists(SITE_INDEX):
+                site_label.config(text=f"Site: {SITE_INDEX}")
+        finally:
+            send_btn.config(state=tk.NORMAL)
+
+    send_btn = tk.Button(root, text="Send", command=send_chat)
+    send_btn.pack(pady=2)
+
     open_btn = tk.Button(root, text="Open Site", command=open_site)
     open_btn.pack(pady=2)
 
     def reset():
         conversation.clear()
-        output_box.delete("1.0", tk.END)
+        chat_history.config(state=tk.NORMAL)
+        chat_history.delete("1.0", tk.END)
+        chat_history.config(state=tk.DISABLED)
+        chat_entry.delete("1.0", tk.END)
         site_label.config(text="")
 
     reset_btn = tk.Button(root, text="Reset", command=reset)
