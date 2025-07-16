@@ -15,6 +15,15 @@ MCP_URL = f"http://localhost:{MCP_PORT}/sse"
 UPLOAD_DIR = os.path.join("site-dir", "uploads")
 DOCS_DIR = os.path.join("site-dir", "docs")
 
+# System prompt explaining how to use the available tools. This is inserted
+# once at the start of a conversation so the model knows to create or update
+# files in the sandbox using write_file.
+SYSTEM_PROMPT = (
+    "You are an expert web developer. Use write_file to create or replace HTML, "
+    "CSS and JS files inside the site-dir. Overwrite existing files when "
+    "refining the site."
+)
+
 # Load environment variables from a .env file if present so the UI and
 # MCP server both have access to API keys without requiring them to be
 # exported globally.
@@ -60,7 +69,11 @@ conversation: list[dict] = []
 
 async def call_compound_tool(prompt: str) -> str:
     """Send the next user prompt using the conversation history."""
+    if not conversation:
+        conversation.append({"role": "system", "content": SYSTEM_PROMPT})
     conversation.append({"role": "user", "content": prompt})
+    if len(conversation) > 2:
+        conversation.append({"role": "user", "content": "Please improve the site. Replace outdated files with enhanced versions and add new code where useful."})
     async with ClientSessionGroup() as group:
         session = await group.connect_to_server(SseServerParameters(url=MCP_URL))
         result = await session.call_tool(
@@ -74,10 +87,16 @@ async def call_compound_tool(prompt: str) -> str:
 
 async def auto_build(prompt: str, iterations: int) -> None:
     """Run multiple build steps automatically using the MCP server."""
+    if iterations < 1:
+        raise ValueError("Build steps must be at least 1")
+    if not conversation:
+        conversation.append({"role": "system", "content": SYSTEM_PROMPT})
     conversation.append({"role": "user", "content": prompt})
     async with ClientSessionGroup() as group:
         session = await group.connect_to_server(SseServerParameters(url=MCP_URL))
-        for _ in range(iterations):
+        for step in range(iterations):
+            if step > 0:
+                conversation.append({"role": "user", "content": "Please improve the site by updating existing files with better code and adding new sections if helpful."})
             result = await session.call_tool(
                 "compound_tool", {"messages": conversation, "model": current_model}
             )
@@ -388,6 +407,7 @@ def main():
             update_history()
             if os.path.exists(SITE_INDEX):
                 site_label.config(text=f"Site: {SITE_INDEX}")
+                webbrowser.open("file://" + SITE_INDEX)
         finally:
             send_btn.config(state=tk.NORMAL)
 
