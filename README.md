@@ -102,7 +102,8 @@ html = asyncio.run(compound_tool(messages))
 The generated site will be written inside `site-dir/` using the agent's tools.
 
 All file paths passed to tools like `write_file` or `read_file` must be
-relative to `site-dir/`. Absolute paths are rejected to keep generation
+relative to `site-dir/` (for example `index.html` or `css/main.css`). Do not
+prefix paths with `site-dir/`. Absolute paths are rejected to keep generation
 contained within the sandbox.
 
 You can keep the `messages` list and append more `{"role": "user"}` entries to

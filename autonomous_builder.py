@@ -8,8 +8,9 @@ from website_mcp import compound_tool
 # ensure the model actually writes HTML/CSS rather than only describing it.
 SYSTEM_PROMPT = (
     "You are an expert web developer. Use write_file to create or overwrite "
-    "files inside the site-dir as you build the site. Replace existing files "
-    "when refining the project."
+    "files when building the site. Provide paths relative to the site-dir "
+    "sandbox such as 'index.html' or 'css/style.css' \u2013 do not prefix them "
+    "with 'site-dir/'. Replace existing files when refining the project."
 )
 
 

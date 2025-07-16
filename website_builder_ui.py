@@ -20,8 +20,8 @@ DOCS_DIR = os.path.join("site-dir", "docs")
 # files in the sandbox using write_file.
 SYSTEM_PROMPT = (
     "You are an expert web developer. Use write_file to create or replace HTML, "
-    "CSS and JS files inside the site-dir. Overwrite existing files when "
-    "refining the site."
+    "CSS and JS files. Provide paths relative to the site-dir sandbox, for "
+    "example 'index.html' or 'scripts/app.js'. Do not prefix paths with 'site-dir/'. Overwrite existing files when refining the site."
 )
 
 # Load environment variables from a .env file if present so the UI and
