@@ -36,7 +36,9 @@ app = FastMCP()
 
 
 class PathArg(BaseModel):
-    path: str = Field(..., description="Relative path under ./site-dir/")
+    path: str = Field(
+        ..., description="Relative path inside site-dir (e.g. 'index.html')"
+    )
 
 
 @app.tool(name="write_file", description="Create or overwrite a text file")
