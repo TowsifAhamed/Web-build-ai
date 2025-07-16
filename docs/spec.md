@@ -54,9 +54,6 @@ Text / headings #1F2937 – High-contrast copy
 Follow the 60-30-10 rule: 60 % neutrals, 30 % primary teal, 10 % accents.
 
 Additional instructions: Code guidelines
-- Pure HTML5 & CSS3 (no Bootstrap/Tailwind).
-- BEM naming + CSS custom properties for colors/spacing.
-- Core CSS ≤ 40 KB gzipped; bundle future JS ≤ 150 KB gzipped.
 - Add data-* hooks to interactive elements for later JS.
 
 Accessibility – WCAG 2.2 AA: logical heading order, alt text, focus rings (2 px dashed #EF476F), contrast ≥ 4.5 : 1.
@@ -65,7 +62,7 @@ Performance targets – LCP < 2.5 s, CLS < 0.1, total blocking time < 150 ms. Us
 
 SEO – Descriptive <title> and meta description; canonical URLs; JSON-LD for Product & Organization.
 
-Analytics & marketing – GA4, Meta Pixel; Klaviyo events for browse abandon. Exit-intent coupon pop-up.
+Analytics & marketing – Exit-intent coupon pop-up.
 
 DevOps – GitHub repo with Vercel / Netlify CI-CD; staging branch previews; nightly DB dump.
 
