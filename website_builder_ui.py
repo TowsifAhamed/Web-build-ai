@@ -24,6 +24,13 @@ SYSTEM_PROMPT = (
     "example 'index.html' or 'scripts/app.js'. Do not prefix paths with 'site-dir/'. Overwrite existing files when refining the site."
 )
 
+# Extended prompt for React projects
+SYSTEM_PROMPT_REACT = (
+    "You are an expert React developer. Call get_os to check the system then "
+    "init_react_project to set up the environment. Use write_file for JSX "
+    "components in site-dir/src and run npm scripts with run_cmd when needed."
+)
+
 # Load environment variables from a .env file if present so the UI and
 # MCP server both have access to API keys without requiring them to be
 # exported globally.
@@ -63,14 +70,19 @@ current_model = ""
 MODEL_OPTIONS: list[str] = []
 SPEC_FILE = os.path.join("docs", "spec.md")
 
+# Supported project types
+SITE_TYPES = ["html", "react"]
+current_site_type = "html"
+
 # conversation history for revision prompts
 conversation: list[dict] = []
 
 
-async def call_compound_tool(prompt: str) -> str:
+async def call_compound_tool(prompt: str, site_type: str) -> str:
     """Send the next user prompt using the conversation history."""
     if not conversation:
-        conversation.append({"role": "system", "content": SYSTEM_PROMPT})
+        system = SYSTEM_PROMPT_REACT if site_type == "react" else SYSTEM_PROMPT
+        conversation.append({"role": "system", "content": system})
     conversation.append({"role": "user", "content": prompt})
     if len(conversation) > 2:
         conversation.append({"role": "user", "content": "Please improve the site. Replace outdated files with enhanced versions and add new code where useful."})
@@ -85,12 +97,13 @@ async def call_compound_tool(prompt: str) -> str:
         return text
 
 
-async def auto_build(prompt: str, iterations: int) -> None:
+async def auto_build(prompt: str, iterations: int, site_type: str) -> None:
     """Run multiple build steps automatically using the MCP server."""
     if iterations < 1:
         raise ValueError("Build steps must be at least 1")
     if not conversation:
-        conversation.append({"role": "system", "content": SYSTEM_PROMPT})
+        system = SYSTEM_PROMPT_REACT if site_type == "react" else SYSTEM_PROMPT
+        conversation.append({"role": "system", "content": system})
     conversation.append({"role": "user", "content": prompt})
     async with ClientSessionGroup() as group:
         session = await group.connect_to_server(SseServerParameters(url=MCP_URL))
@@ -144,6 +157,25 @@ def parse_spec_file():
     if m:
         extra = m.group(1).strip()
     return name, style, colors, desc, extra
+
+
+def ensure_react_env() -> None:
+    """Create a basic React project inside site-dir if missing."""
+    pkg_json = os.path.join("site-dir", "package.json")
+    if os.path.exists(pkg_json):
+        return
+    try:
+        subprocess.run(
+            ["npm", "create", "vite@latest", ".", "--", "--template", "react"],
+            cwd="site-dir",
+            check=True,
+        )
+        subprocess.run(["npm", "install"], cwd="site-dir", check=True)
+    except Exception:
+        messagebox.showwarning(
+            "React setup failed",
+            "Could not initialize React environment. Ensure Node.js and npm are installed.",
+        )
 
 
 def start_server() -> subprocess.Popen:
@@ -226,6 +258,11 @@ def main():
     model_var = tk.StringVar(value=current_model)
     model_menu = tk.OptionMenu(scroll_frame, model_var, *MODEL_OPTIONS)
     model_menu.pack(fill="x")
+
+    tk.Label(scroll_frame, text="Site type:").pack(anchor="w")
+    type_var = tk.StringVar(value=current_site_type)
+    type_menu = tk.OptionMenu(scroll_frame, type_var, *SITE_TYPES)
+    type_menu.pack(fill="x")
 
     tk.Label(scroll_frame, text="Build steps:").pack(anchor="w")
     iter_var = tk.IntVar(value=3)
@@ -339,6 +376,7 @@ def main():
                 "Prompt required", "Please enter a website description"
             )
             return
+        site_t = type_var.get()
         parts = [f"Business name: {name}" if name else "", desc]
         if style:
             parts.append(f"Design style: {style}")
@@ -379,11 +417,14 @@ def main():
             if doc_texts:
                 parts.append("Guideline docs:\n" + "\n\n".join(doc_texts))
 
+        if site_t == "react":
+            parts.append("Project type: React")
+            ensure_react_env()
         final_prompt = " \n".join(p for p in parts if p)
         iterations = iter_var.get()
         run_btn.config(state=tk.DISABLED)
         try:
-            anyio.run(auto_build, final_prompt, iterations)
+            anyio.run(auto_build, final_prompt, iterations, site_t)
             update_history()
             if os.path.exists(SITE_INDEX):
                 site_label.config(text=f"Site: {SITE_INDEX}")
@@ -397,12 +438,15 @@ def main():
     def send_chat():
         global current_model
         current_model = model_var.get()
+        site_t = type_var.get()
         msg = chat_entry.get("1.0", tk.END).strip()
         if not msg:
             return
         send_btn.config(state=tk.DISABLED)
         try:
-            anyio.run(call_compound_tool, msg)
+            if site_t == "react":
+                ensure_react_env()
+            anyio.run(call_compound_tool, msg, site_t)
             chat_entry.delete("1.0", tk.END)
             update_history()
             if os.path.exists(SITE_INDEX):
@@ -416,6 +460,19 @@ def main():
 
     open_btn = tk.Button(right_frame, text="Open Site", command=open_site)
     open_btn.pack(pady=2)
+
+    def deploy_vercel():
+        try:
+            subprocess.run(["vercel", "--prod"], cwd="site-dir", check=True)
+            messagebox.showinfo("Vercel", "Deployment complete")
+        except Exception:
+            messagebox.showwarning(
+                "Vercel deploy failed",
+                "Ensure the Vercel CLI is installed and you are logged in",
+            )
+
+    vercel_btn = tk.Button(right_frame, text="Deploy to Vercel", command=deploy_vercel)
+    vercel_btn.pack(pady=2)
 
     def reset():
         conversation.clear()
