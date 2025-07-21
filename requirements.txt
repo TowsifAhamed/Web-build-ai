@@ -3,3 +3,4 @@ groq
 python-dotenv
 anyio
 google-generativeai
+sentence-transformers

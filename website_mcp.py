@@ -1,9 +1,10 @@
 from mcp.server import FastMCP
 from pydantic import BaseModel, Field
-import subprocess, os, json, textwrap
+import subprocess, os, json, textwrap, platform
 from groq import AsyncGroq
 import google.generativeai as genai
 from dotenv import load_dotenv
+from embedding_manager import EmbeddingManager
 
 # Load environment variables from a local .env file so the Groq API key
 # can be provided without exporting it globally.
@@ -21,6 +22,9 @@ if not GROQ_API_KEY and not GEMINI_API_KEY:
 import argparse
 
 SANDBOX = os.path.abspath(os.path.join(os.path.dirname(__file__), "site-dir"))
+
+# Embedding manager for tracking file embeddings
+EMBED_MANAGER = EmbeddingManager(SANDBOX)
 
 
 def sandbox_path(rel: str) -> str:
@@ -47,6 +51,7 @@ def write_file(path: PathArg, content: str) -> str:
     os.makedirs(os.path.dirname(full), exist_ok=True)
     with open(full, "w", encoding="utf-8") as fh:
         fh.write(content)
+    EMBED_MANAGER.update_file(path.path)
     return f"wrote {path.path}"
 
 
@@ -117,6 +122,30 @@ def search_docs(arg: SearchQuery) -> str:
     return "\n\n".join(results)[:4096]
 
 
+# New tool: return basic OS information
+@app.tool(name="get_os", description="Get operating system info")
+def get_os() -> str:
+    return platform.platform()
+
+
+# New tool: initialize a React project inside the sandbox
+@app.tool(name="init_react_project", description="Create React environment in site-dir")
+def init_react_project() -> str:
+    pkg = os.path.join(SANDBOX, "package.json")
+    if os.path.exists(pkg):
+        return "React project already initialized"
+    try:
+        subprocess.run(
+            ["npm", "create", "vite@latest", ".", "--", "--template", "react"],
+            cwd=SANDBOX,
+            check=True,
+        )
+        subprocess.run(["npm", "install"], cwd=SANDBOX, check=True)
+        return "React environment ready"
+    except Exception as exc:
+        return f"Failed to set up React: {exc}"
+
+
 TOOLS = [
     {
         "type": "function",
@@ -177,6 +206,22 @@ TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_os",
+            "description": "Get operating system info",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "init_react_project",
+            "description": "Create React environment in site-dir",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
 ]
 
 
@@ -225,6 +270,10 @@ async def _run_groq(messages: list[dict], model: str) -> list[str]:
                     result = run_cmd(Cmd(cmd=args.get("cmd", "")))
                 elif call.function.name == "search_docs":
                     result = search_docs(SearchQuery(query=args.get("query", "")))
+                elif call.function.name == "get_os":
+                    result = get_os()
+                elif call.function.name == "init_react_project":
+                    result = init_react_project()
                 else:
                     result = f"Unknown tool: {call.function.name}"
 
@@ -260,7 +309,15 @@ async def _run_gemini(messages: list[dict], model: str) -> list[str]:
     last = messages[-1]
     response = await chat.send_message_async(
         last.get("content", ""),
-        tools=[write_file, read_file, list_files, run_cmd, search_docs],
+        tools=[
+            write_file,
+            read_file,
+            list_files,
+            run_cmd,
+            search_docs,
+            get_os,
+            init_react_project,
+        ],
     )
 
     content = response.candidates[0].content

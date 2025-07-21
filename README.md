@@ -12,6 +12,8 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+For React projects you also need Node.js and npm available in your PATH.
+
 Create a `.env` file in the project root and add your Groq API key:
 
 ```bash
@@ -32,6 +34,10 @@ python website_mcp.py --port 4876 --transport sse
 ```
 
 The server creates a `site-dir/` directory which acts as a sandbox for generated files. It is automatically added to `.gitignore`.
+Each time a file inside `site-dir/` is written via the `write_file` tool, its contents
+are embedded using a small SentenceTransformer model and stored in
+`site-dir/embeddings.json`. Only files that change are re-embedded, keeping
+bandwidth and token usage low.
 
 ## Using the UI
 
@@ -47,10 +53,14 @@ When the UI opens you can provide a detailed design concept:
 2. **Design style** – e.g. modern, minimal, playful.
 3. **Color scheme** – main colors to use.
 4. **Model** – choose from Groq and Gemini models using the drop-down.
-5. **Website description** – a short overview of the pages or layout.
-6. **Additional instructions** – any extra features or notes.
-7. **Uploaded images** – optional logos or product pictures you want to include.
-8. **Guideline docs** – text files with design briefs or other requirements.
+5. **Site type** – select either *html* or *react*.
+6. **Website description** – a short overview of the pages or layout.
+7. **Additional instructions** – any extra features or notes.
+8. **Uploaded images** – optional logos or product pictures you want to include.
+9. **Guideline docs** – text files with design briefs or other requirements.
+
+Selecting **react** initializes a simple React project inside `site-dir/` the first time you build. Subsequent runs reuse that environment.
+When building a React project the agent calls `get_os` to report the current operating system and `init_react_project` to create the environment using Vite and npm.
 
 Use **Add Images** to select image files from your computer. They will be copied
 into `site-dir/uploads/` and listed in the UI. Mention them in your prompt or
@@ -70,6 +80,10 @@ refine the site with follow-up instructions. Use the **Reset** button to start a
 fresh conversation. When generation finishes, the UI opens `site-dir/index.html`
 in your browser and shows the path in a link. You can also press **Open Site**
 at any time to view the latest version.
+
+When you're happy with the output you can deploy directly to Vercel by clicking
+**Deploy to Vercel**. Make sure the Vercel CLI is installed and that you're
+logged in first.
 
 The interface also includes a chat area that displays the full conversation.
 You can send additional messages in the **Chat input** box and press **Send** to
@@ -113,6 +127,29 @@ which you can also add back into the list for a persistent conversation.
 The MCP server also exposes a `search_docs` tool that retrieves snippets from
 files in `site-dir/docs/`. Provide a query string and the tool will return any
 matching text, enabling a simple retrieval-augmented workflow.
+
+## Deploying on Vercel
+
+The generated site is a static project inside `site-dir/`, so it can be
+deployed using [Vercel](https://vercel.com). Install the Vercel CLI with:
+
+```bash
+npm install -g vercel
+```
+
+Then run the following commands from the project root:
+
+```bash
+cd site-dir
+vercel --prod
+```
+
+Vercel will prompt you for a project name and optionally create a
+`vercel.json` file. Both plain HTML/CSS sites and the React build output work
+with this workflow.
+
+The UI also exposes a **Deploy to Vercel** button that runs these commands for
+you.
 
 ## Deploying on AWS with NGINX
 
