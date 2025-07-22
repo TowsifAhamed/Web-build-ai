@@ -77,9 +77,10 @@ Fill in these fields and click **Run**. The generated HTML and CSS files will ap
 
 Each time you press **Run**, your prompt is added to the conversation so you can
 refine the site with follow-up instructions. Use the **Reset** button to start a
-fresh conversation. When generation finishes, the UI opens `site-dir/index.html`
-in your browser and shows the path in a link. You can also press **Open Site**
-at any time to view the latest version.
+fresh conversation. When generation finishes the UI opens the site for you. For
+plain HTML projects it loads `site-dir/index.html`. When you choose the React
+site type it automatically runs `npm run dev` and opens `http://localhost:5173`.
+You can also press **Open Site** at any time to view the latest version.
 
 When you're happy with the output you can deploy directly to Vercel by clicking
 **Deploy to Vercel**. Make sure the Vercel CLI is installed and that you're
