@@ -14,6 +14,8 @@ MCP_PORT = 4876
 MCP_URL = f"http://localhost:{MCP_PORT}/sse"
 UPLOAD_DIR = os.path.join("site-dir", "uploads")
 DOCS_DIR = os.path.join("site-dir", "docs")
+DEV_SERVER_PORT = 5173
+vite_process: subprocess.Popen | None = None
 
 # System prompt explaining how to use the available tools. This is inserted
 # once at the start of a conversation so the model knows to create or update
@@ -175,6 +177,25 @@ def ensure_react_env() -> None:
         messagebox.showwarning(
             "React setup failed",
             "Could not initialize React environment. Ensure Node.js and npm are installed.",
+        )
+
+
+def start_vite_server() -> None:
+    """Launch the Vite development server if it's not already running."""
+    global vite_process
+    if vite_process and vite_process.poll() is None:
+        return
+    try:
+        vite_process = subprocess.Popen(
+            ["npm", "run", "dev"],
+            cwd="site-dir",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except Exception:
+        messagebox.showwarning(
+            "Vite failed",
+            "Could not start the React development server. Ensure Node.js and npm are installed.",
         )
 
 
@@ -358,10 +379,16 @@ def main():
         chat_history.config(state=tk.DISABLED)
 
     def open_site():
-        if os.path.exists(SITE_INDEX):
-            webbrowser.open("file://" + SITE_INDEX)
+        site_t = type_var.get()
+        if site_t == "react":
+            ensure_react_env()
+            start_vite_server()
+            webbrowser.open(f"http://localhost:{DEV_SERVER_PORT}")
         else:
-            messagebox.showinfo("No site", "index.html not found")
+            if os.path.exists(SITE_INDEX):
+                webbrowser.open("file://" + SITE_INDEX)
+            else:
+                messagebox.showinfo("No site", "index.html not found")
 
     def run_prompt():
         global current_model
@@ -426,7 +453,11 @@ def main():
         try:
             anyio.run(auto_build, final_prompt, iterations, site_t)
             update_history()
-            if os.path.exists(SITE_INDEX):
+            if site_t == "react":
+                site_label.config(text=f"Site: http://localhost:{DEV_SERVER_PORT}")
+                start_vite_server()
+                webbrowser.open(f"http://localhost:{DEV_SERVER_PORT}")
+            elif os.path.exists(SITE_INDEX):
                 site_label.config(text=f"Site: {SITE_INDEX}")
                 webbrowser.open("file://" + SITE_INDEX)
         finally:
@@ -449,7 +480,11 @@ def main():
             anyio.run(call_compound_tool, msg, site_t)
             chat_entry.delete("1.0", tk.END)
             update_history()
-            if os.path.exists(SITE_INDEX):
+            if site_t == "react":
+                site_label.config(text=f"Site: http://localhost:{DEV_SERVER_PORT}")
+                start_vite_server()
+                webbrowser.open(f"http://localhost:{DEV_SERVER_PORT}")
+            elif os.path.exists(SITE_INDEX):
                 site_label.config(text=f"Site: {SITE_INDEX}")
                 webbrowser.open("file://" + SITE_INDEX)
         finally:
@@ -487,6 +522,8 @@ def main():
 
     def on_close():
         server.terminate()
+        if vite_process and vite_process.poll() is None:
+            vite_process.terminate()
         root.destroy()
 
     root.protocol("WM_DELETE_WINDOW", on_close)
