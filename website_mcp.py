@@ -27,6 +27,23 @@ SANDBOX = os.path.abspath(os.path.join(os.path.dirname(__file__), "site-dir"))
 EMBED_MANAGER = EmbeddingManager(SANDBOX)
 
 
+def check_node_version(min_major: int = 20) -> tuple[bool, str]:
+    """Return (True, version) if Node.js meets the required major version."""
+    try:
+        result = subprocess.run(
+            ["node", "--version"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True,
+        )
+        ver = result.stdout.strip().lstrip("v")
+        major = int(ver.split(".")[0])
+    except (FileNotFoundError, ValueError, subprocess.CalledProcessError):
+        return False, "Node.js not found"
+    return (major >= min_major, f"v{ver}")
+
+
 def sandbox_path(rel: str) -> str:
     """Return an absolute path inside the sandbox or raise ValueError."""
     full = os.path.abspath(os.path.join(SANDBOX, rel))
@@ -131,6 +148,9 @@ def get_os() -> str:
 # New tool: initialize a React project inside the sandbox
 @app.tool(name="init_react_project", description="Create React environment in site-dir")
 def init_react_project() -> str:
+    ok, ver = check_node_version()
+    if not ok:
+        return f"Node.js 20+ required. {ver}"
     pkg = os.path.join(SANDBOX, "package.json")
     if os.path.exists(pkg):
         return "React project already initialized"
