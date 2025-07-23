@@ -2,3 +2,4 @@ site-dir/
 __pycache__/
 .venv/
 .env
+tmp/
