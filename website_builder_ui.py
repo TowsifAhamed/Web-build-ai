@@ -18,6 +18,41 @@ DEV_SERVER_PORT = 5173
 vite_process: subprocess.Popen | None = None
 
 
+def ensure_nodejs(min_major: int = 20) -> bool:
+    """Install Node.js via nvm if missing and return True if available."""
+    if check_node_version(min_major):
+        return True
+    try:
+        # Install nvm if it's not already present
+        if subprocess.run("command -v nvm", shell=True).returncode != 0:
+            subprocess.run(
+                "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash",
+                shell=True,
+                check=True,
+            )
+        # Install and activate the required Node version
+        subprocess.run(
+            [
+                "bash",
+                "-c",
+                f"source $HOME/.nvm/nvm.sh && nvm install {min_major} && nvm use {min_major}",
+            ],
+            check=True,
+        )
+        # Update PATH for the current process
+        node_bin = subprocess.check_output(
+            [
+                "bash",
+                "-c",
+                f"source $HOME/.nvm/nvm.sh && nvm which {min_major}",
+            ]
+        ).decode().strip()
+        os.environ["PATH"] = os.path.dirname(node_bin) + os.pathsep + os.environ.get("PATH", "")
+    except Exception:
+        return False
+    return check_node_version(min_major)
+
+
 def check_node_version(min_major: int = 20) -> bool:
     """Return True if the installed Node.js meets the required major version."""
     try:
@@ -180,7 +215,7 @@ def parse_spec_file():
 
 def ensure_react_env() -> None:
     """Create a basic React project inside site-dir if missing."""
-    if not check_node_version():
+    if not ensure_nodejs():
         messagebox.showwarning(
             "Node.js required",
             "Node.js 20 or newer is required to run the React dev server.",
@@ -208,7 +243,7 @@ def start_vite_server() -> None:
     global vite_process
     if vite_process and vite_process.poll() is None:
         return
-    if not check_node_version():
+    if not ensure_nodejs():
         messagebox.showwarning(
             "Node.js required",
             "Node.js 20 or newer is required to run the React dev server.",

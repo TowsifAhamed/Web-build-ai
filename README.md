@@ -12,7 +12,16 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-For React projects you also need Node.js and npm available in your PATH.
+For React projects you also need Node.js and npm available in your PATH. The UI
+will attempt to install Node.js **20** automatically using [nvm](https://github.com/nvm-sh/nvm)
+if it is missing. You can also install it manually with:
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+source ~/.nvm/nvm.sh
+nvm install 20
+```
+
 Node.js **20** or newer is required when running the dev server. Older
 versions cause a `TypeError: crypto.hash is not a function` failure when
 starting Vite.
