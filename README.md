@@ -13,6 +13,9 @@ pip install -r requirements.txt
 ```
 
 For React projects you also need Node.js and npm available in your PATH.
+Node.js **20** or newer is required when running the dev server. Older
+versions cause a `TypeError: crypto.hash is not a function` failure when
+starting Vite.
 
 Create a `.env` file in the project root and add your Groq API key:
 

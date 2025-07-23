@@ -17,6 +17,23 @@ DOCS_DIR = os.path.join("site-dir", "docs")
 DEV_SERVER_PORT = 5173
 vite_process: subprocess.Popen | None = None
 
+
+def check_node_version(min_major: int = 20) -> bool:
+    """Return True if the installed Node.js meets the required major version."""
+    try:
+        out = subprocess.run(
+            ["node", "--version"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True,
+        )
+        ver = out.stdout.strip().lstrip("v")
+        major = int(ver.split(".")[0])
+    except (FileNotFoundError, ValueError, subprocess.CalledProcessError):
+        return False
+    return major >= min_major
+
 # System prompt explaining how to use the available tools. This is inserted
 # once at the start of a conversation so the model knows to create or update
 # files in the sandbox using write_file.
@@ -163,6 +180,12 @@ def parse_spec_file():
 
 def ensure_react_env() -> None:
     """Create a basic React project inside site-dir if missing."""
+    if not check_node_version():
+        messagebox.showwarning(
+            "Node.js required",
+            "Node.js 20 or newer is required to run the React dev server.",
+        )
+        return
     pkg_json = os.path.join("site-dir", "package.json")
     if os.path.exists(pkg_json):
         return
@@ -184,6 +207,12 @@ def start_vite_server() -> None:
     """Launch the Vite development server if it's not already running."""
     global vite_process
     if vite_process and vite_process.poll() is None:
+        return
+    if not check_node_version():
+        messagebox.showwarning(
+            "Node.js required",
+            "Node.js 20 or newer is required to run the React dev server.",
+        )
         return
     try:
         vite_process = subprocess.Popen(
