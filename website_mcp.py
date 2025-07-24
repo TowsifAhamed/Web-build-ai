@@ -1,6 +1,11 @@
-from mcp.server import FastMCP
+try:
+    from mcp.server import FastMCP
+except ModuleNotFoundError as exc:
+    raise ModuleNotFoundError(
+        "Required package 'fastmcp' is missing. Install dependencies with 'pip install -r requirements.txt' before running the server."
+    ) from exc
 from pydantic import BaseModel, Field
-import subprocess, os, json, textwrap, platform
+import subprocess, os, json, textwrap, platform, difflib, time
 from groq import AsyncGroq
 import google.generativeai as genai
 from dotenv import load_dotenv
@@ -62,14 +67,36 @@ class PathArg(BaseModel):
     )
 
 
+WRITE_LOG = os.path.join(SANDBOX, "write_log.txt")
+
+
 @app.tool(name="write_file", description="Create or overwrite a text file")
 def write_file(path: PathArg, content: str) -> str:
     full = sandbox_path(path.path)
     os.makedirs(os.path.dirname(full), exist_ok=True)
+    old = ""
+    if os.path.exists(full):
+        try:
+            with open(full, "r", encoding="utf-8") as fh:
+                old = fh.read()
+        except OSError:
+            old = ""
     with open(full, "w", encoding="utf-8") as fh:
         fh.write(content)
     EMBED_MANAGER.update_file(path.path)
-    return f"wrote {path.path}"
+    diff = "\n".join(
+        difflib.unified_diff(
+            old.splitlines(), content.splitlines(), lineterm=""
+        )
+    )
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        with open(WRITE_LOG, "a", encoding="utf-8") as log:
+            log.write(f"{timestamp} {path.path}\n{diff}\n\n")
+    except OSError:
+        pass
+    summary = "created" if not old else "updated"
+    return f"{summary} {path.path}\n{diff[:1000]}"
 
 
 @app.tool(name="read_file", description="Read a text file")

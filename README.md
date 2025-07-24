@@ -12,6 +12,11 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+The `requirements.txt` file installs the `fastmcp` package which provides the
+tooling used by `website_mcp.py`. If you skip this step the server will fail
+with a `ModuleNotFoundError` for `mcp`. The install pulls in PyTorch and may
+take a few minutes to complete on the first run.
+
 For React projects you also need Node.js and npm available in your PATH. The UI
 will attempt to install Node.js **20** automatically using [nvm](https://github.com/nvm-sh/nvm)
 if it is missing. You can also install it manually with:
