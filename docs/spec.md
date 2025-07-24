@@ -71,4 +71,4 @@ Tone & microcopy – Friendly Banglish phrases (e.g., empty cart: “Ektu wait, 
 Uploaded images: logo.jpg, cover.jpeg
 uploaded images are in uploads folder in the site-dir directory.
 
-Create the html css based website with generated contents and an attractive UI layout with beautiful designs
+Create the website using **React** and modern CSS. Structure the project so it can automatically run with `npm run dev` via Vite (you don't need to run it, just code the site). Generate all components and assets so the React development server starts without errors and displays an attractive UI based on these guidelines.
