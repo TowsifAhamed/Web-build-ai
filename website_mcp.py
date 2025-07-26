@@ -279,7 +279,7 @@ TOOLS = [
 ]
 
 
-async def _run_groq(messages: list[dict], model: str) -> list[str]:
+async def _run_groq(messages: list[dict], model: str) -> str:
     """Run the conversation using Groq LLM with OpenAI-style tool calling."""
     if not GROQ_API_KEY:
         raise RuntimeError("GROQ_API_KEY environment variable not set.")
@@ -337,10 +337,10 @@ async def _run_groq(messages: list[dict], model: str) -> list[str]:
                     }
                 )
         else:
-            return [message.content] if message.content else []
+            return message.content or ""
 
 
-async def _run_gemini(messages: list[dict], model: str) -> list[str]:
+async def _run_gemini(messages: list[dict], model: str) -> str:
     """Run the conversation using Google's Gemini models with function calls."""
     if not GEMINI_API_KEY:
         raise RuntimeError(
@@ -374,7 +374,7 @@ async def _run_gemini(messages: list[dict], model: str) -> list[str]:
 
     content = response.candidates[0].content
     text_parts = [p.text for p in content.parts if hasattr(p, "text")]
-    return ["".join(text_parts)]
+    return "".join(text_parts)
 
 
 @app.tool(
@@ -382,7 +382,7 @@ async def _run_gemini(messages: list[dict], model: str) -> list[str]:
 )
 async def compound_tool(
     messages: list[dict], model: str = "meta-llama/llama-4-maverick-17b-128e-instruct"
-) -> list[str]:
+) -> str:
     """Dispatch to Groq or Gemini depending on the model name."""
     if model.lower().startswith("gemini"):
         return await _run_gemini(messages, model)
