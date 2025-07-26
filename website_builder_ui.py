@@ -40,14 +40,20 @@ def ensure_nodejs(min_major: int = 20) -> bool:
             check=True,
         )
         # Update PATH for the current process
-        node_bin = subprocess.check_output(
-            [
-                "bash",
-                "-c",
-                f"source $HOME/.nvm/nvm.sh && nvm which {min_major}",
-            ]
-        ).decode().strip()
-        os.environ["PATH"] = os.path.dirname(node_bin) + os.pathsep + os.environ.get("PATH", "")
+        node_bin = (
+            subprocess.check_output(
+                [
+                    "bash",
+                    "-c",
+                    f"source $HOME/.nvm/nvm.sh && nvm which {min_major}",
+                ]
+            )
+            .decode()
+            .strip()
+        )
+        os.environ["PATH"] = (
+            os.path.dirname(node_bin) + os.pathsep + os.environ.get("PATH", "")
+        )
     except Exception:
         return False
     return check_node_version(min_major)
@@ -68,6 +74,7 @@ def check_node_version(min_major: int = 20) -> bool:
     except (FileNotFoundError, ValueError, subprocess.CalledProcessError):
         return False
     return major >= min_major
+
 
 # System prompt explaining how to use the available tools. This is inserted
 # once at the start of a conversation so the model knows to create or update
@@ -139,7 +146,12 @@ async def call_compound_tool(prompt: str, site_type: str) -> str:
         conversation.append({"role": "system", "content": system})
     conversation.append({"role": "user", "content": prompt})
     if len(conversation) > 2:
-        conversation.append({"role": "user", "content": "Please improve the site. Replace outdated files with enhanced versions and add new code where useful."})
+        conversation.append(
+            {
+                "role": "user",
+                "content": "Please improve the site. Replace outdated files with enhanced versions and add new code where useful.",
+            }
+        )
     async with ClientSessionGroup() as group:
         session = await group.connect_to_server(SseServerParameters(url=MCP_URL))
         result = await session.call_tool(
@@ -163,7 +175,12 @@ async def auto_build(prompt: str, iterations: int, site_type: str) -> None:
         session = await group.connect_to_server(SseServerParameters(url=MCP_URL))
         for step in range(iterations):
             if step > 0:
-                conversation.append({"role": "user", "content": "Please improve the site by updating existing files with better code and adding new sections if helpful."})
+                conversation.append(
+                    {
+                        "role": "user",
+                        "content": "Please improve the site by updating existing files with better code and adding new sections if helpful.",
+                    }
+                )
             result = await session.call_tool(
                 "compound_tool", {"messages": conversation, "model": current_model}
             )
@@ -226,7 +243,16 @@ def ensure_react_env() -> None:
         return
     try:
         subprocess.run(
-            ["npm", "create", "vite@latest", ".", "--", "--template", "react"],
+            [
+                "npm",
+                "exec",
+                "--yes",
+                "create-vite@latest",
+                ".",
+                "--",
+                "--template",
+                "react",
+            ],
             cwd="site-dir",
             check=True,
         )

@@ -85,9 +85,7 @@ def write_file(path: PathArg, content: str) -> str:
         fh.write(content)
     EMBED_MANAGER.update_file(path.path)
     diff = "\n".join(
-        difflib.unified_diff(
-            old.splitlines(), content.splitlines(), lineterm=""
-        )
+        difflib.unified_diff(old.splitlines(), content.splitlines(), lineterm="")
     )
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
     try:
@@ -183,7 +181,16 @@ def init_react_project() -> str:
         return "React project already initialized"
     try:
         subprocess.run(
-            ["npm", "create", "vite@latest", ".", "--", "--template", "react"],
+            [
+                "npm",
+                "exec",
+                "--yes",
+                "create-vite@latest",
+                ".",
+                "--",
+                "--template",
+                "react",
+            ],
             cwd=SANDBOX,
             check=True,
         )
@@ -275,9 +282,7 @@ TOOLS = [
 async def _run_groq(messages: list[dict], model: str) -> list[str]:
     """Run the conversation using Groq LLM with OpenAI-style tool calling."""
     if not GROQ_API_KEY:
-        raise RuntimeError(
-            "GROQ_API_KEY environment variable not set."
-        )
+        raise RuntimeError("GROQ_API_KEY environment variable not set.")
     client = AsyncGroq(api_key=GROQ_API_KEY)
 
     conversation = messages[:]
